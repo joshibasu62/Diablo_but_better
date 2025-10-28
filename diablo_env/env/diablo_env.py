@@ -17,15 +17,22 @@ class DiabloEnv(gym.Env):
 
         # Simulation setup
         self.render_mode = render_mode
-        self.physics_client = None
 
-        # Action space: let's assume 8 joints (4 per leg)
+        if self.render_mode == "human":
+            self.physics_client = p.connect(p.GUI)
+        else:
+            self.physics_client = p.connect(p.DIRECT)
+
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        set_gravity()
+
+        # Action space: 8 joints (4 per leg)
         self.num_joints = 8
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32
         )
 
-        # Observation space (example: joint positions + base position)
+        # Observation space
         obs_dim = self.num_joints + 3
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
@@ -37,6 +44,9 @@ class DiabloEnv(gym.Env):
 
         self.robot_id = None
 
+        # Load 
+        p.loadURDF("plane.urdf",basePosition=[0, 0, 0.10025])
+
     def _connect(self):
         if self.render_mode == "human":
             return p.connect(p.GUI)
@@ -46,16 +56,12 @@ class DiabloEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        if self.physics_client is not None:
-            p.disconnect(self.physics_client)
+        # Remove old robot if it exists
+        if self.robot_id is not None:
+            p.removeBody(self.robot_id)
 
-        self.physics_client = self._connect()
-        p.setAdditionalSearchPath(pybullet_data.getDataPath())
-
-        p.loadURDF("plane.urdf")
-        set_gravity()
-
-        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.2])
+        # Load robot at starting position
+        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.10025])
 
         obs = self._get_obs()
         return obs, {}
@@ -67,23 +73,22 @@ class DiabloEnv(gym.Env):
         return obs
 
     def step(self, action):
-        """
-        Step function using safer PD velocity control.
-        Action: desired joint velocities [-1, 1] per joint.
-        """
-        max_vel = 1.0      # rad/s
-        max_torque = 5.0   # Nm per joint
-
-        # Clip actions to safe velocity range
-        action = np.clip(action, -max_vel, max_vel)
-
+        #position control
+        max_force = 10.0
+        position_gain = 0.5
+        
+        # Convert actions to small position changes around neutral position
+        neutral_positions = [0.0] * self.num_joints  # Adjust if your robot has different neutral pose
+        target_positions = neutral_positions + action * 0.1  # Small position changes
+        
         for i in range(self.num_joints):
             p.setJointMotorControl2(
                 bodyUniqueId=self.robot_id,
                 jointIndex=i,
-                controlMode=p.VELOCITY_CONTROL,
-                targetVelocity=action[i],
-                force=max_torque
+                controlMode=p.POSITION_CONTROL,
+                targetPosition=target_positions[i],
+                force=max_force,
+                positionGain=position_gain
             )
 
         # Step the simulation
@@ -102,7 +107,7 @@ class DiabloEnv(gym.Env):
 
         # Done if robot tips or falls
         euler = p.getEulerFromQuaternion(orn)
-        done = pos[2] < 0.15 or abs(euler[0]) > 0.5 or abs(euler[1]) > 0.5
+        done = pos[2] < 0.05 or abs(euler[0]) > 0.5 or abs(euler[1]) > 0.5
 
         return obs, reward, done, False, {}
 

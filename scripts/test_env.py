@@ -11,20 +11,29 @@ a_size = env.action_space.shape[0]
 
 print("_____OBSERVATION SPACE_____ \n")
 print("The State Space is: ", s_size)
-print("Sample observation", env.observation_space.sample()) # Get a random observation
+print("Sample observation", env.observation_space.sample())
 
-print("\n _____ACTION SPACE_____ \n")
+print("\n_____ACTION SPACE_____ \n")
 print("The Action Space is: ", a_size)
-print("Action Space Sample", env.action_space.sample()) # Take a random action
+print("Action Space Sample", env.action_space.sample())
 
-for _ in range(1000):
-    action = env.action_space.sample()  # random action
-    obs, reward, terminated, truncated, info = env.step(action)
+try:
+    step_count = 0
+    max_steps = 1000
+    while True:  # Keep running until user interrupts
+        action = env.action_space.sample()  # Random action
+        obs, reward, terminated, truncated, info = env.step(action)
+        step_count += 1
 
-    if env.render_mode == "human":
-        time.sleep(1.0 / 60.0)  # ~60 FPS
+        if env.render_mode == "human":
+            time.sleep(1.0 / 60.0)  # ~60 FPS
 
-    if terminated or truncated:
-        obs, info = env.reset()
+        if terminated or truncated or step_count >= max_steps:
+            obs, info = env.reset()
+            step_count = 0
 
-env.close()
+except KeyboardInterrupt:
+    print("Simulation stopped by user")
+
+finally:
+    env.close()  # Clean shutdown
