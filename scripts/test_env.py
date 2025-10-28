@@ -20,13 +20,13 @@ print("Action Space Sample", env.action_space.sample())
 try:
     step_count = 0
     max_steps = 1000
-    while True:  # Keep running until user interrupts
-        action = env.action_space.sample()  # Random action
+    while True: 
+        action = env.action_space.sample()  
         obs, reward, terminated, truncated, info = env.step(action)
         step_count += 1
 
         if env.render_mode == "human":
-            time.sleep(1.0 / 60.0)  # ~60 FPS
+            time.sleep(1.0 / 60.0) 
 
         if terminated or truncated or step_count >= max_steps:
             obs, info = env.reset()
@@ -36,4 +36,4 @@ except KeyboardInterrupt:
     print("Simulation stopped by user")
 
 finally:
-    env.close()  # Clean shutdown
+    env.close() 

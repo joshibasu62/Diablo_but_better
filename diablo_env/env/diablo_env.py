@@ -45,7 +45,7 @@ class DiabloEnv(gym.Env):
         self.robot_id = None
 
         # Load 
-        p.loadURDF("plane.urdf",basePosition=[0, 0, 0.10025])
+        p.loadURDF("plane.urdf",basePosition=[0, 0, 0.01])
 
     def _connect(self):
         if self.render_mode == "human":
@@ -56,12 +56,11 @@ class DiabloEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        # Remove old robot if it exists
         if self.robot_id is not None:
             p.removeBody(self.robot_id)
 
-        # Load robot at starting position
-        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.10025])
+        # Load robot 
+        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.01])
 
         obs = self._get_obs()
         return obs, {}
