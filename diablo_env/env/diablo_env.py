@@ -26,18 +26,7 @@ class DiabloEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         set_gravity()
 
-        # Action space: 8 joints (4 per leg)
-        self.num_joints = 8
-        self.action_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32
-        )
-
-        # Observation space
-        obs_dim = self.num_joints + 3
-        self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
-        )
-
+        
         # Paths
         self.assets_dir = os.path.join(os.path.dirname(__file__), "..", "assets")
         self.urdf_path = os.path.join(self.assets_dir, "urdf", "robot.urdf")
@@ -45,13 +34,49 @@ class DiabloEnv(gym.Env):
         self.robot_id = None
 
         # Load 
-        p.loadURDF("plane.urdf",basePosition=[0, 0, 0.01])
+        p.loadURDF("plane.urdf",basePosition=[0, 0, 0])
 
-    def _connect(self):
-        if self.render_mode == "human":
-            return p.connect(p.GUI)
-        else:
-            return p.connect(p.DIRECT)
+        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.495])
+
+
+        # Print joint info for debugging will remove later after testing
+        num_joints = p.getNumJoints(self.robot_id)
+        for i in range(num_joints):
+            info = p.getJointInfo(self.robot_id, i)
+            print(i, info[1].decode("utf-8"), info[2])
+
+
+        # Get all revolute joints
+        self.revolute_joints = []
+        num_joints = p.getNumJoints(self.robot_id)
+        for i in range(num_joints):
+            info = p.getJointInfo(self.robot_id, i)
+            joint_type = info[2]
+            if joint_type == p.JOINT_REVOLUTE:  # Only revolute joints
+                self.revolute_joints.append(i)
+
+        # Remove this print after testing
+        print("Revolute joints:", self.revolute_joints)
+
+        # Example: define action space based on revolute joints
+        self.num_joints = len(self.revolute_joints)
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32
+        )
+
+        # Example: observation space = joint positions + velocities
+        obs_dim = 2 * self.num_joints + 3
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
+        )
+
+    def get_observation(self):
+        joints = p.getJointStates(self.robot_id, self.revolute_joints)
+        positions = [state[0] for state in joints]
+        velocities = [state[1] for state in joints]
+        base_pos, _ = p.getBasePositionAndOrientation(self.robot_id)
+        return np.array(positions + velocities + list(base_pos), dtype=np.float32)
+
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -60,7 +85,7 @@ class DiabloEnv(gym.Env):
             p.removeBody(self.robot_id)
 
         # Load robot 
-        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.01])
+        self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.495])
 
         obs = self._get_obs()
         return obs, {}
@@ -94,7 +119,7 @@ class DiabloEnv(gym.Env):
         p.stepSimulation()
 
         # Get observation
-        obs = self._get_obs()
+        obs = self.get_observation()
 
         # Reward: upright + small forward motion bonus
         pos, orn = p.getBasePositionAndOrientation(self.robot_id)
@@ -108,7 +133,11 @@ class DiabloEnv(gym.Env):
         euler = p.getEulerFromQuaternion(orn)
         done = pos[2] < 0.05 or abs(euler[0]) > 0.5 or abs(euler[1]) > 0.5
 
-        return obs, reward, done, False, {}
+        truncated = False
+        terminated = done
+        info = {}
+
+        return obs, reward, truncated, terminated, info
 
 
 

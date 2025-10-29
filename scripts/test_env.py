@@ -17,11 +17,13 @@ print("\n_____ACTION SPACE_____ \n")
 print("The Action Space is: ", a_size)
 print("Action Space Sample", env.action_space.sample())
 
+
 try:
     step_count = 0
     max_steps = 1000
     while True: 
         action = env.action_space.sample()  
+        # print(action)
         obs, reward, terminated, truncated, info = env.step(action)
         step_count += 1
 
