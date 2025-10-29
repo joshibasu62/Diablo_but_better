@@ -15,6 +15,29 @@ class DiabloEnv(gym.Env):
     def __init__(self, render_mode="human"):
         super().__init__()
 
+        self.torque_left_joint_1 = 10.0
+        self.torque_left_joint_2 = 8.0
+        # self.torque_left_joint_3 = 6.0   it is knee so motor not required     
+        self.torque_left_joint_4 = 10.0
+
+        self.torque_right_joint_1 = 10.0
+        self.torque_right_joint_2 = 8.0     
+        # self.torque_right_joint_3 = 6.0     it is also knee   
+        self.torque_right_joint_4 = 10.0
+
+        self.torques = [
+            self.torque_left_joint_1, #body joint left
+            self.torque_left_joint_2, #hip joint left
+            # self.torque_left_joint_3,
+            self.torque_left_joint_4, #wheel joint left
+            self.torque_right_joint_1,
+            self.torque_right_joint_2,
+            # self.torque_right_joint_3,
+            self.torque_right_joint_4,
+            ]
+
+        
+
         # Simulation setup
         self.render_mode = render_mode
 
@@ -48,24 +71,25 @@ class DiabloEnv(gym.Env):
 
         # Get all revolute joints
         self.revolute_joints = []
-        num_joints = p.getNumJoints(self.robot_id)
+        self.num_joints = p.getNumJoints(self.robot_id)
         for i in range(num_joints):
             info = p.getJointInfo(self.robot_id, i)
             joint_type = info[2]
             if joint_type == p.JOINT_REVOLUTE:  # Only revolute joints
                 self.revolute_joints.append(i)
+        self.num_rev_joints = len(self.revolute_joints)
 
         # Remove this print after testing
         print("Revolute joints:", self.revolute_joints)
 
         # Example: define action space based on revolute joints
-        self.num_joints = len(self.revolute_joints)
+        self.num_joints_with_input = len(self.torques)
         self.action_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32
+            low=-1.0, high=1.0, shape=(self.num_joints_with_input,), dtype=np.float32
         )
 
         # Example: observation space = joint positions + velocities
-        obs_dim = 2 * self.num_joints + 3
+        obs_dim = 2 * self.num_rev_joints + 3*2
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
         )
@@ -74,8 +98,8 @@ class DiabloEnv(gym.Env):
         joints = p.getJointStates(self.robot_id, self.revolute_joints)
         positions = [state[0] for state in joints]
         velocities = [state[1] for state in joints]
-        base_pos, _ = p.getBasePositionAndOrientation(self.robot_id)
-        return np.array(positions + velocities + list(base_pos), dtype=np.float32)
+        base_pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+        return np.array(positions + velocities + list(base_pos) + list(orn), dtype=np.float32)
 
 
     def reset(self, seed=None, options=None):
