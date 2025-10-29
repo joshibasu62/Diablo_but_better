@@ -87,14 +87,9 @@ class DiabloEnv(gym.Env):
         # Load robot 
         self.robot_id = load_robot(self.urdf_path, base_position=[0, 0, 0.495])
 
-        obs = self._get_obs()
+        obs = self.get_observation()
         return obs, {}
 
-    def _get_obs(self):
-        pos, orn = p.getBasePositionAndOrientation(self.robot_id)
-        joint_states = [p.getJointState(self.robot_id, i)[0] for i in range(self.num_joints)]
-        obs = np.array(list(pos) + joint_states, dtype=np.float32)
-        return obs
 
     def step(self, action):
         #position control
