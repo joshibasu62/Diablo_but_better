@@ -17,22 +17,26 @@ class DiabloEnv(gym.Env):
 
         self.torque_left_joint_1 = 10.0
         self.torque_left_joint_2 = 8.0
-        # self.torque_left_joint_3 = 6.0   it is knee so motor not required     
+
+        # it is knee so motor not required
+        self.torque_left_joint_3 = 6.0        
         self.torque_left_joint_4 = 10.0
 
         self.torque_right_joint_1 = 10.0
         self.torque_right_joint_2 = 8.0     
-        # self.torque_right_joint_3 = 6.0     it is also knee   
+
+        # it is also knee   
+        self.torque_right_joint_3 = 6.0     
         self.torque_right_joint_4 = 10.0
 
         self.torques = [
             self.torque_left_joint_1, #body joint left
             self.torque_left_joint_2, #hip joint left
-            # self.torque_left_joint_3,
+            self.torque_left_joint_3,
             self.torque_left_joint_4, #wheel joint left
             self.torque_right_joint_1,
             self.torque_right_joint_2,
-            # self.torque_right_joint_3,
+            self.torque_right_joint_3,
             self.torque_right_joint_4,
             ]
 
@@ -77,19 +81,17 @@ class DiabloEnv(gym.Env):
             joint_type = info[2]
             if joint_type == p.JOINT_REVOLUTE:  # Only revolute joints
                 self.revolute_joints.append(i)
-        self.num_rev_joints = len(self.revolute_joints)
 
         # Remove this print after testing
         print("Revolute joints:", self.revolute_joints)
 
         # Example: define action space based on revolute joints
-        self.num_joints_with_input = len(self.torques)
         self.action_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(self.num_joints_with_input,), dtype=np.float32
+            low=-1.0, high=1.0, shape=(self.torques.__len__(),), dtype=np.float32
         )
 
         # Example: observation space = joint positions + velocities
-        obs_dim = 2 * self.num_rev_joints + 3*2
+        obs_dim = 2 * self.revolute_joints.__len__() + 3*2
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
         )
@@ -121,10 +123,10 @@ class DiabloEnv(gym.Env):
         position_gain = 0.5
         
         # Convert actions to small position changes around neutral position
-        neutral_positions = [0.0] * self.num_joints  # Adjust if your robot has different neutral pose
+        neutral_positions = [0.0] * self.revolute_joints.__len__()  # Adjust if your robot has different neutral pose
         target_positions = neutral_positions + action * 0.1  # Small position changes
         
-        for i in range(self.num_joints):
+        for i in range(self.revolute_joints.__len__()):
             p.setJointMotorControl2(
                 bodyUniqueId=self.robot_id,
                 jointIndex=i,
@@ -142,6 +144,7 @@ class DiabloEnv(gym.Env):
 
         # Reward: upright + small forward motion bonus
         pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+        print("Base position:", pos)
         _, ang_vel = p.getBaseVelocity(self.robot_id)
 
         upright_reward = max(0, pos[2])            # reward for height
